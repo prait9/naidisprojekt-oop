@@ -21,7 +21,7 @@ npx sequelize-cli db:migrate
 
 ```bash
 cd frontend
-npm install
+npm run dev
 ```
 
 ## Käivitamine
@@ -30,7 +30,7 @@ npm install
 
 ```bash
 cd backend
-npm start
+node index.js
 ```
 
 Server käivitub pordi 3000 peal: `http://localhost:3000`
@@ -41,7 +41,7 @@ Uues terminalis:
 
 ```bash
 cd frontend
-npm run dev
+node index.js
 ```
 
 Frontend käivitub: `http://localhost:5173`
