@@ -2,10 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
+const axios = require('axios');
 const sequelize = require('./utils/db');
 const { DataTypes, Op } = require('sequelize');
 
-const EnergyReading = sequelize.define('EnergyReading', {
+const EnergyReading = sequelize.define('EnergyReadings', {
   timestamp: {
     type: DataTypes.DATE,
     allowNull: false
@@ -239,6 +240,160 @@ app.get('/api/readings', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+app.post('/api/sync/prices', async (req, res) => {
+  try {
+    let { start, end, location } = req.body || {};
+
+    const now = new Date();
+    const defaultStart = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(); 
+    const defaultEnd = now.toISOString();
+
+    start = start || defaultStart;
+    end = end || defaultEnd;
+    location = (location || 'EE').toUpperCase();
+
+    const validLocations = ['EE', 'LV', 'FI'];
+    if (!validLocations.includes(location.toUpperCase())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid location. Must be one of: EE, LV, FI'
+      });
+    }
+
+    const isoUtcRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+    if (!isoUtcRegex.test(start)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Start date must be in ISO 8601 format with UTC timezone (e.g., 2026-01-01T10:00:00Z)'
+      });
+    }
+    if (!isoUtcRegex.test(end)) {
+      return res.status(400).json({
+        success: false,
+        error: 'End date must be in ISO 8601 format with UTC timezone (e.g., 2026-01-01T10:00:00Z)'
+      });
+    }
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return res.status(400).json({
+        success: false, 
+        error: 'Start and end must be valid ISO 8601 UTC timestamps'
+      });
+    }
+
+    if (startDate > endDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'Start must be before or equal to end'
+      });
+    }
+
+    const locationKey = location.toLowerCase();
+
+    const apiUrl = 'https://dashboard.elering.ee/api/nps/price';
+    const response = await axios.get(apiUrl, {
+      params: {
+        start: start,
+        end: end,
+        fields: locationKey
+      }
+    });
+
+    if (!response.data || !response.data.success || !response.data.data) {
+      return res.status(503).json({
+        success: false,
+        error: 'PRICE_API_UNAVAILABLE'
+      });
+    }
+
+    const apiData = response.data.data;
+
+    if (!apiData[locationKey]) {
+      return res.status(404).json({
+        success: false,
+        error: `No data available for location ${location.toUpperCase()}`
+      });
+    }
+
+    const priceData = apiData[locationKey];
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+
+
+    for (const entry of priceData) {
+      try {
+        const timestamp = new Date(entry.timestamp * 1000);
+        if (Number.isNaN(timestamp.getTime())) {
+          skipped++;
+          continue;
+        }
+
+        const price = entry.price;
+        if (price == null || typeof price !== 'number') {
+          skipped++;
+          continue;
+        }
+        const existing = await EnergyReading.findOne({
+          where: {
+            timestamp: timestamp,
+            location: location.toUpperCase()
+          }
+        });
+
+        if (existing) {
+          await existing.update({
+            price_eur_mwh: price,
+            source: 'API'
+          });
+          updated++;
+          continue;
+        }
+
+        await EnergyReading.create({
+          timestamp: timestamp,
+          location: location.toUpperCase(),
+          price_eur_mwh: price,
+          source: 'API'
+        });
+
+        inserted++;
+      } catch (recordError) {
+        console.error('Record processing error:', recordError);
+        skipped++;
+      }
+    }
+
+    res.json({
+      success: true,
+      summary: {
+        inserted,
+        updated,
+        skipped
+      },
+      message: `API data fetch completed: inserted=${inserted}, updated=${updated}, skipped=${skipped}`,
+      location: location.toUpperCase(),
+      dateRange: {
+        start: start,
+        end: end
+      }
+    });
+  } catch (error) {
+    console.error('API fetch error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      summary: {
+        inserted: 0,
+        updated: 0,
+        skipped: 0
+      }
     });
   }
 });

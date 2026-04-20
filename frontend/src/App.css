@@ -198,6 +198,31 @@ body {
 	letter-spacing: 0.12em;
 }
 
+.chart-wrap {
+	margin-top: 14px;
+	padding: 12px;
+	border-radius: 16px;
+	border: 1px solid rgba(148, 163, 184, 0.16);
+	background: #f3f4f6;
+	display: flex;
+	justify-content: center;
+	overflow-x: auto;
+}
+
+.chart-wrap .MuiChartsSurface {
+	margin: 0 auto;
+}
+
+.chart-detail {
+	margin-top: 12px;
+	padding: 10px 12px;
+	border-radius: 10px;
+	background: rgba(2, 6, 23, 0.08);
+	color: #dcddde;
+	font-size: 0.92rem;
+	font-weight: 600;
+}
+
 @media (max-width: 640px) {
 	.app-shell {
 		padding: 16px;
