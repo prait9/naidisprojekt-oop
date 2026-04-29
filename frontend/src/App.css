@@ -151,7 +151,19 @@ body {
 	cursor: pointer;
 }
 
-.primary-btn:disabled {
+.secondary-btn {
+	border: 1px solid rgba(248, 113, 113, 0.35);
+	border-radius: 999px;
+	padding: 12px 18px;
+	font-weight: 700;
+	color: #fee2e2;
+	background: rgba(127, 29, 29, 0.35);
+	cursor: pointer;
+	margin-top: 14px;
+}
+
+.primary-btn:disabled,
+.secondary-btn:disabled {
 	opacity: 0.7;
 	cursor: wait;
 }
@@ -239,8 +251,8 @@ body {
 		align-items: stretch;
 	}
 
-	.primary-btn {
+	.primary-btn,
+	.secondary-btn {
 		width: 100%;
 	}
 }
-

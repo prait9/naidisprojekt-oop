@@ -9,6 +9,8 @@ function App() {
   const [error, setError] = useState(null);
   const [syncResult, setSyncResult] = useState(null);
   const [syncLoading, setSyncLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
   const [chartLoading, setChartLoading] = useState(false);
   const [chartError, setChartError] = useState(null);
   const [readings, setReadings] = useState([]);
@@ -211,6 +213,41 @@ function App() {
     }
   };
 
+  const handleDeleteUploadData = async () => {
+    setCleanupLoading(true);
+    setCleanupResult(null);
+
+    try {
+      const response = await fetch(
+        "http://localhost:3000/api/readings?source=UPLOAD",
+        {
+          method: "DELETE",
+        }
+      );
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Cleanup failed. Please try again.");
+      }
+
+      setCleanupResult({
+        success: true,
+        message: data.message || "No UPLOAD records found.",
+      });
+      setReadings([]);
+      setLocationAverages([]);
+      setLocationComparison([]);
+      setChartError(null);
+    } catch (err) {
+      setCleanupResult({
+        success: false,
+        message: "Cleanup failed. Please try again.",
+      });
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
   const selectedRange =
     startDate && endDate ? `${startDate} - ${endDate}` : "Vali kuupäevavahemik";
   const countryDisplay = country ? `Valitud riik: ${country}` : "Vali riik";
@@ -327,6 +364,26 @@ function App() {
           >
             {!syncResult.success && (syncResult.error || "Tulemus puudub")}
             {syncResult.success && "Sünkroonimine õnnestus."}
+          </div>
+        )}
+
+        <button
+          className="secondary-btn"
+          onClick={handleDeleteUploadData}
+          disabled={cleanupLoading}
+        >
+          {cleanupLoading ? "Deleting..." : "Delete UPLOAD data"}
+        </button>
+
+        {cleanupResult && (
+          <div
+            className={
+              cleanupResult.success
+                ? "message message-success"
+                : "message message-error"
+            }
+          >
+            {cleanupResult.message}
           </div>
         )}
       </section>
