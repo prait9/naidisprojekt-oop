@@ -2,7 +2,7 @@
   "development": {
     "username": "root",
     "password": "qwerty",
-    "database": "naidisprojekt",
+    "database": "EnergyReadings",
     "host": "localhost",
     "dialect": "mysql"
   }

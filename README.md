@@ -1,35 +1,50 @@
-# Energia Rakendus
+# Energiahinna rakendus
 
-See projekt on täispinu rakendus energiahindade vaatamiseks ja haldamiseks. Lahendus koosneb `frontend` kaustas olevast React + Vite kasutajaliidesest ja `backend` kaustas olevast Node.js + Express API-st, mis suhtleb MySQL andmebaasiga.
+Täispinu rakendus elektrihindade importimiseks, sünkroonimiseks, kuvamiseks ja haldamiseks. Projekt koosneb Node.js + Express backendist, React + Vite frontendist ja MySQL andmebaasist.
 
-## 1. Keskkonna seadistamine
+## 1. Keskkonna seadistamine (Environment setup)
 
 ### Vajalikud tööriistad
 
-- `Node.js` soovituslikult versioon `20+`
-- `npm` soovituslikult versioon `10+`
-- `MySQL` või `MariaDB`, mis toetab Sequelize MySQL draiverit
+- Node.js 20 või uuem
+- npm 10 või uuem
+- MySQL 8 või MariaDB ühilduv versioon
+- Git
 
-### Andmebaasi eeldused
+Pythonit ja Dockerit selle projekti käivitamiseks vaja ei ole.
 
-Backend kasutab praegu failis `backend/utils/db.js` seadistatud ühendust:
+### Projekti allalaadimine
 
-- andmebaasi nimi: `EnergyReadings`
-- kasutaja: `root`
-- parool: `qwerty`
-- host: `localhost`
+```bash
+git clone <repository-url>
+cd naidisprojekt
+```
 
-Enne käivitamist loo oma MySQL serveris see andmebaas:
+Kui projekt on juba arvutis olemas, liigu projekti juurkausta.
+
+### Andmebaasi loomine
+
+Backend kasutab vaikimisi MySQL andmebaasi nimega `EnergyReadings`.
+
+Loo andmebaas MySQL-is:
 
 ```sql
 CREATE DATABASE EnergyReadings;
 ```
 
-Kui soovid kasutada teisi andmeid, muuda vastavalt faili `backend/utils/db.js`.
+Rakenduse runtime ühendus asub failis `backend/utils/db.js`. Sequelize migratsioonide ühendus asub failis `backend/config/config.json`. Mõlemas peab olema sama andmebaasi nimi, kasutaja, parool ja host.
+
+Vaikimisi väärtused:
+
+- database: `EnergyReadings`
+- username: `root`
+- password: `qwerty`
+- host: `localhost`
+- dialect: `mysql`
 
 ### Sõltuvuste paigaldamine
 
-Paigalda sõltuvused projekti juurkaustas, backendis ja frontendis:
+Paigalda sõltuvused juurkaustas, backendis ja frontendis:
 
 ```bash
 npm install
@@ -39,71 +54,91 @@ cd ../frontend
 npm install
 ```
 
-Windows PowerShellis võib `npm` olla blokeeritud execution policy tõttu. Sel juhul kasuta `npm.cmd`, näiteks:
+Windows PowerShellis võib `npm` olla execution policy tõttu blokeeritud. Sel juhul kasuta sama käsu `.cmd` varianti:
 
 ```bash
 npm.cmd install
 ```
 
-## 2. Andmebaasi migratsioonide käivitamine
+## 2. Andmebaasi migratsioonide käivitamine (How to run migrations)
 
-### Migratsioonide asukoht
+Migratsioonid asuvad kaustas `backend/migrations`.
 
-Migratsioonifailid asuvad kaustas `backend/migrations`.
+### Migratsioonide käivitamine
 
-### Kuidas migratsioone käivitada
-
-Mine backendi kausta ja käivita:
+Mine backend kausta ja käivita:
 
 ```bash
 cd backend
 npx sequelize-cli db:migrate
 ```
 
-See loob tabeli `EnergyReadings`, kus hoitakse energiahindade kirjeid.
+See loob tabeli `EnergyReadings`, kuhu salvestatakse elektrihinna kirjed.
 
 ### Uue migratsiooni loomine
 
-Kui soovid luua uue migratsiooni, kasuta näiteks:
+Uue migratsioonifaili loomiseks:
 
 ```bash
 cd backend
-npx sequelize-cli migration:generate --name add-some-change
+npx sequelize-cli migration:generate --name migration-name
 ```
 
-Pärast faili täitmist rakenda see jälle käsuga:
+Pärast migratsioonifaili täitmist rakenda muudatus:
 
 ```bash
 npx sequelize-cli db:migrate
 ```
 
-## 3. JSON-andmete importimine
+### Migratsiooni tagasivõtmine
 
-### Kust JSON fail tuleb
+Viimase migratsiooni tagasivõtmiseks:
+
+```bash
+npx sequelize-cli db:migrate:undo
+```
+
+## 3. JSON-andmete importimine (How to import JSON data)
 
 Imporditav JSON fail asub siin:
 
-- `backend/data/energy_dump.json`
+```text
+backend/data/energy_dump.json
+```
 
-### Kuidas import käivitada
-
-JSON import tehakse API endpointi kaudu. Kui backend töötab, saada järgmine päring:
+Backend loeb selle faili endpointi kaudu. Käivita backend ja saada POST päring:
 
 ```bash
 curl -X POST http://localhost:3000/api/import/json
 ```
 
-See loeb faili `backend/data/energy_dump.json`, valideerib kirjed ja lisab sobivad kirjed andmebaasi allikaga `UPLOAD`.
+Import teeb järgmist:
 
-### Impordi käitumine
+- loeb andmed failist `backend/data/energy_dump.json`
+- valideerib timestamp väärtused ISO 8601 UTC formaadis
+- jätab vigased timestampid vahele
+- kontrollib duplikaate `timestamp + location` järgi
+- salvestab korrektsed read allikaga `UPLOAD`
 
-- vigased ajatemplid jäetakse vahele
-- duplikaadid tuvastatakse `timestamp + location` kombinatsiooni järgi
-- vastuses tagastatakse kokkuvõte väljadega `inserted`, `skipped` ja `duplicates_detected`
+Eduka impordi vastuses on kokkuvõte:
 
-## 4. Backend’i ja frontend’i käivitamine
+```json
+{
+  "success": true,
+  "summary": {
+    "inserted": 1,
+    "skipped": 2,
+    "duplicates_detected": 1
+  },
+  "message": "Import completed: inserted=1, skipped=2, duplicates_detected=1"
+}
+```
+
+## 4. Backend'i ja frontend'i käivitamine (How to run backend and frontend)
 
 ### Backend
+
+Käivita backend eraldi terminalis:
 
 ```bash
 cd backend
@@ -112,97 +147,116 @@ npm start
 
 Backend töötab aadressil:
 
-- `http://localhost:3000`
+```text
+http://localhost:3000
+```
+
+Health check:
+
+```text
+http://localhost:3000/api/health
+```
 
 ### Frontend
 
-Käivita frontend eraldi terminalis:
+Käivita frontend teises terminalis:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-Frontend töötab vaikimisi aadressil:
+Frontend töötab Vite arendusserveris tavaliselt aadressil:
 
-- `http://localhost:5173`
+```text
+http://localhost:5173
+```
 
-### Rakenduse tööloogika
+Frontend eeldab, et backend töötab aadressil `http://localhost:3000`.
 
-- frontend teeb päringuid backendi API-le
-- backend loeb ja kirjutab MySQL andmebaasi
-- hinnasünkroniseerimine kasutab välist Eleringi API-t
+## 5. Testide käivitamine (How to run tests)
 
-## 5. Testide käivitamine
+Backend testid kasutavad Node.js sisseehitatud testiraamistikku `node:test`.
 
-### Kasutatav testiraamistik
-
-Backendi testid kasutavad Node.js sisseehitatud test runnerit `node:test`.
-
-### Kuidas teste käivitada
-
-Kõik backendi testid saab käivitada projekti juurkaustast ühe käsuga:
+Kõik testid käivituvad projekti juurkaustast ühe käsuga:
 
 ```bash
 npm test
 ```
 
-See käivitab tegelikult:
+Windows PowerShellis võib vaja minna:
+
+```bash
+npm.cmd test
+```
+
+Juurkausta testikäsk käivitab backendi testid:
 
 ```bash
 npm --prefix backend test
 ```
 
-Soovi korral saab teste käivitada ka otse backendi kaustast:
+Otse backend kaustast saab teste käivitada nii:
 
 ```bash
 cd backend
 npm test
 ```
 
-## 6. Lühike arhitektuuri kirjeldus
+Testid kontrollivad muu hulgas JSON importi, timestamp valideerimist, duplikaatide tuvastamist ja `UPLOAD` andmete kustutamist.
+
+## 6. Lühike arhitektuuri kirjeldus (Brief architecture description)
+
+Projekt on jaotatud kolmeks põhiosaks.
 
 ### Backend
 
-Backend on ehitatud `Express` raamistikuga. Põhifailid on:
+Backend asub kaustas `backend` ja on ehitatud Express raamistikuga.
 
-- `backend/index.js`: käivitab serveri ja Sequelize ühenduse
-- `backend/app.js`: loob Express rakenduse ja defineerib endpointid
-- `backend/services/reading-service.js`: impordi ja cleanup loogika
-- `backend/utils/validation.js`: kuupäeva- ja asukohavalideerimine
-- `backend/utils/db.js`: Sequelize andmebaasiühendus
+Olulised failid:
+
+- `backend/index.js` - loob Sequelize mudeli, sünkroonib andmebaasi ja käivitab serveri
+- `backend/app.js` - defineerib API endpointid ja globaalse error handler'i
+- `backend/services/reading-service.js` - sisaldab JSON impordi ja cleanup loogikat
+- `backend/utils/validation.js` - valideerib kuupäevi ja regioone
+- `backend/utils/db.js` - loob Sequelize andmebaasiühenduse
+- `backend/models/energy-reading.js` - defineerib `EnergyReadings` tabeli mudeli
+
+Backend suhtleb MySQL andmebaasiga Sequelize ORM-i kaudu. Välisest Eleringi API-st hindade toomiseks kasutatakse Axios teeki.
 
 ### Frontend
 
-Frontend on ehitatud `React` ja `Vite` abil. Peamine kasutajaliides asub failis:
+Frontend asub kaustas `frontend` ja on ehitatud React + Vite abil.
 
-- `frontend/src/App.jsx`
+Olulised failid:
 
-Frontend võimaldab:
+- `frontend/src/App.jsx` - peamine kasutajaliides ja API päringud
+- `frontend/src/App.css` - rakenduse stiilid
+- `frontend/src/main.jsx` - React rakenduse mountimine
 
-- valida kuupäevavahemikku ja regiooni
-- sünkroonida hinnad API kaudu
-- laadida ja visualiseerida hinnad graafikutel
-- kustutada ainult `UPLOAD` allikaga andmed
+Frontend võimaldab valida kuupäevavahemiku ja regiooni, sünkroonida hindu, vaadata graafikuid ning kustutada ainult `UPLOAD` allikaga andmeid.
 
 ### Andmebaas
 
-Andmed salvestatakse tabelisse `EnergyReadings`, kus iga kirje sisaldab:
+Andmed salvestatakse MySQL tabelisse `EnergyReadings`.
 
-- `timestamp`
-- `location`
-- `price_eur_mwh`
-- `source`
-- `createdAt`
-- `updatedAt`
+Tabeli peamised väljad:
 
-## 7. API sisemised endpoint’id
+- `timestamp` - elektrihinna ajatempel
+- `location` - regioon, näiteks `EE`, `LV` või `FI`
+- `price_eur_mwh` - hind eurodes MWh kohta
+- `source` - andmete allikas, kas `UPLOAD` või `API`
+- `createdAt` ja `updatedAt` - Sequelize ajatemplid
 
-### `GET /api/health`
+## 7. API sisemised endpoint'id (Document API internal endpoints)
 
-- eesmärk: kontrollida, kas backend töötab ja kas DB ühendus õnnestub
-- sisend: puudub
-- näidisvastus:
+### GET `/api/health`
+
+Kontrollib, kas backend töötab ja kas andmebaasiühendus on korras.
+
+Sisend puudub.
+
+Näidisvastus:
 
 ```json
 {
@@ -211,11 +265,13 @@ Andmed salvestatakse tabelisse `EnergyReadings`, kus iga kirje sisaldab:
 }
 ```
 
-### `POST /api/import/json`
+### POST `/api/import/json`
 
-- eesmärk: importida andmed failist `backend/data/energy_dump.json`
-- sisend: puudub
-- näidisvastus:
+Impordib andmed failist `backend/data/energy_dump.json`.
+
+Sisend puudub.
+
+Näidisvastus:
 
 ```json
 {
@@ -229,20 +285,25 @@ Andmed salvestatakse tabelisse `EnergyReadings`, kus iga kirje sisaldab:
 }
 ```
 
-### `GET /api/readings`
+### GET `/api/readings`
 
-- eesmärk: tagastada energiahinnad valitud perioodi ja asukoha järgi
-- query parameetrid:
-  - `start`: ISO 8601 UTC ajatempel, näiteks `2026-01-01T00:00:00Z`
-  - `end`: ISO 8601 UTC ajatempel, näiteks `2026-01-02T00:00:00Z`
-  - `location`: `EE`, `LV` või `FI`
-- näidispäring:
+Tagastab elektrihinna kirjed valitud perioodi ja regiooni järgi.
+
+Query parameetrid:
+
+- `start` - ISO 8601 UTC timestamp koos ajavööndi infoga, näiteks `2026-01-01T00:00:00Z`
+- `end` - ISO 8601 UTC timestamp koos ajavööndi infoga, näiteks `2026-01-02T00:00:00Z`
+- `location` - lubatud väärtused on `EE`, `LV`, `FI`
+
+Reegel: `end` peab olema suurem kui `start`.
+
+Näidispäring:
 
 ```bash
 curl "http://localhost:3000/api/readings?location=EE&start=2026-01-01T00:00:00Z&end=2026-01-02T00:00:00Z"
 ```
 
-- näidisvastus:
+Näidisvastus:
 
 ```json
 {
@@ -257,12 +318,32 @@ curl "http://localhost:3000/api/readings?location=EE&start=2026-01-01T00:00:00Z&
 }
 ```
 
-### `DELETE /api/readings?source=UPLOAD`
+Validation error näide:
 
-- eesmärk: kustutada ainult need kirjed, mille `source = "UPLOAD"`
-- query parameeter:
-  - `source=UPLOAD`
-- näidisvastus edu korral:
+```json
+{
+  "success": false,
+  "error": "start must be a valid ISO 8601 UTC timestamp with timezone info"
+}
+```
+
+### DELETE `/api/readings?source=UPLOAD`
+
+Kustutab ainult kirjed, mille `source` on `UPLOAD`.
+
+See endpoint ei kustuta `API` allikaga ridu.
+
+Query parameeter:
+
+- `source=UPLOAD`
+
+Näidispäring:
+
+```bash
+curl -X DELETE "http://localhost:3000/api/readings?source=UPLOAD"
+```
+
+Näidisvastus, kui kirjed kustutati:
 
 ```json
 {
@@ -272,7 +353,7 @@ curl "http://localhost:3000/api/readings?location=EE&start=2026-01-01T00:00:00Z&
 }
 ```
 
-- näidisvastus juhul kui kirjeid ei leitud:
+Näidisvastus, kui `UPLOAD` kirjeid ei olnud:
 
 ```json
 {
@@ -282,10 +363,11 @@ curl "http://localhost:3000/api/readings?location=EE&start=2026-01-01T00:00:00Z&
 }
 ```
 
-### `POST /api/sync/prices`
+### POST `/api/sync/prices`
 
-- eesmärk: tuua hinnad Eleringi API-st ja salvestada need allikaga `API`
-- request body:
+Toob elektrihinnad Eleringi API-st ja salvestab need andmebaasi allikaga `API`.
+
+Request body:
 
 ```json
 {
@@ -295,9 +377,9 @@ curl "http://localhost:3000/api/readings?location=EE&start=2026-01-01T00:00:00Z&
 }
 ```
 
-- `start` ja `end` on valikulised; kui neid ei anta, kasutatakse viimase 24 tunni vahemikku
-- `location` on valikuline; vaikimisi kasutatakse `EE`
-- näidisvastus:
+`start` ja `end` on valikulised. Kui neid ei saadeta, kasutatakse viimase 24 tunni vahemikku. `location` on samuti valikuline ja vaikimisi `EE`.
+
+Näidisvastus:
 
 ```json
 {
@@ -316,32 +398,50 @@ curl "http://localhost:3000/api/readings?location=EE&start=2026-01-01T00:00:00Z&
 }
 ```
 
-## 8. Peamised sõltuvused ja nende eesmärk
+### Error handling
+
+Kõik API vead tagastatakse turvalise JSON vastusena. Stack trace'i kasutajale ei tagastata.
+
+Näide:
+
+```json
+{
+  "success": false,
+  "error": "end must be greater than start"
+}
+```
+
+## 8. Peamised sõltuvused ja nende eesmärk (Key dependencies and their purpose)
 
 ### Backend
 
-- `express`: HTTP server ja API endpointide loomine
-- `cors`: võimaldab frontendil teha päringuid backendi teisele originile
-- `sequelize`: ORM MySQL andmebaasiga suhtlemiseks
-- `sequelize-cli`: migratsioonide loomine ja käivitamine
-- `mysql2`: MySQL draiver, mida Sequelize kasutab
-- `axios`: välise Eleringi API poole HTTP päringute tegemine
+- `express` - HTTP server ja API endpointide defineerimine
+- `cors` - lubab frontendil teha päringuid backendi aadressile
+- `sequelize` - ORM MySQL andmebaasiga suhtlemiseks
+- `sequelize-cli` - migratsioonide loomine ja käivitamine
+- `mysql2` - MySQL draiver Sequelize jaoks
+- `axios` - HTTP päringud välise Eleringi API vastu
+- `node:test` - Node.js sisseehitatud testiraamistik backendi testide jaoks
 
 ### Frontend
 
-- `react`: kasutajaliidese komponentide loomine
-- `react-dom`: React rakenduse renderdamine brauserisse
-- `vite`: arenduskeskkond ja build tööriist frontendile
-- `@mui/material`: kasutajaliidese komponendid
-- `@mui/x-charts`: joon- ja tulpdiagrammide kuvamine
-- `@emotion/react` ja `@emotion/styled`: MUI stiilisüsteemi sõltuvused
+- `react` - kasutajaliidese komponentide loomine
+- `react-dom` - React rakenduse renderdamine brauserisse
+- `vite` - frontend arendusserver ja build tööriist
+- `@mui/material` - Material UI komponendid
+- `@mui/x-charts` - joondiagrammid ja tulpdiagrammid hindade kuvamiseks
+- `@emotion/react` - MUI stiilide runtime tugi
+- `@emotion/styled` - styled API MUI komponentide jaoks
+- `eslint` - JavaScripti ja React koodi staatiline kontroll
 
 ## Soovituslik käivitamisjärjekord
 
-1. Loo MySQL andmebaas `EnergyReadings`.
-2. Paigalda sõltuvused juurkaustas, backendis ja frontendis.
-3. Käivita backendi migratsioonid.
-4. Käivita backend.
-5. Käivita frontend.
-6. Vajadusel impordi JSON andmed käsuga `POST /api/import/json`.
-7. Käivita testid käsuga `npm test`.
+1. Paigalda Node.js, npm ja MySQL.
+2. Loo MySQL andmebaas `EnergyReadings`.
+3. Kontrolli DB seadeid failides `backend/utils/db.js` ja `backend/config/config.json`.
+4. Paigalda sõltuvused juurkaustas, backendis ja frontendis.
+5. Käivita migratsioonid käsuga `npx sequelize-cli db:migrate`.
+6. Käivita backend käsuga `npm start`.
+7. Käivita frontend käsuga `npm run dev`.
+8. Impordi vajadusel JSON andmed endpointiga `POST /api/import/json`.
+9. Käivita testid käsuga `npm test`.

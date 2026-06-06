@@ -1,4 +1,5 @@
 const AppError = require('../errors/app-error');
+const { parseUtcTimestamp } = require('../utils/validation');
 
 async function importReadings({ EnergyReading, readings }) {
   let inserted = 0;
@@ -7,22 +8,7 @@ async function importReadings({ EnergyReading, readings }) {
 
   for (const reading of readings) {
     try {
-      const timestampValue = reading.timestamp;
-      if (!timestampValue || typeof timestampValue !== 'string') {
-        skipped++;
-        continue;
-      }
-
-      if (!timestampValue.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)) {
-        skipped++;
-        continue;
-      }
-
-      const timestamp = new Date(timestampValue);
-      if (Number.isNaN(timestamp.getTime())) {
-        skipped++;
-        continue;
-      }
+      const timestamp = parseUtcTimestamp(reading.timestamp, 'timestamp');
 
       let location = reading.location || 'EE';
       location = location.trim().toUpperCase();
